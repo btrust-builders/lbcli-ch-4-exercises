@@ -1,0 +1,118 @@
+name: Btrust Builders Learn Bitcoin CLI Chapter 4 Exercises
+
+on:
+  push:
+    branches:
+      - main  # Trigger on pushes to the main branch
+
+jobs:
+  test-bitcoin-cli-exercises:
+    runs-on: ubuntu-latest  # Use the latest Ubuntu environment
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4  # Check out the repository code
+
+      - name: Run Bitcoin Core setup script
+        run: |
+          chmod +x .github/setup.sh
+          .github/setup.sh
+
+      - name: Start bitcoind in regtest mode
+        run: |
+          bitcoind -regtest -daemon
+          echo "Waiting for bitcoind to be ready..."
+
+          # Wait for bitcoind to start (max 30s)
+          for i in {1..30}; do
+            if bitcoin-cli -regtest getblockchaininfo > /dev/null 2>&1; then
+              echo "bitcoind is ready!"
+              break
+            fi
+            echo "Still waiting for bitcoind..."
+            sleep 1
+          done
+
+      - name: Verify Wallet Creation
+        run: |
+            chmod +x submission/01.sh
+            WALLET=$(submission/01.sh)
+            if [[ "$WALLET" == *"btrustwallet"* ]]; then
+              echo "Wallet creation passed!"
+            else
+              echo "Wallet creation failed!"
+              exit 1
+            fi
+
+      - name: Verify Change Address Generation
+        run: |
+          chmod +x submission/02.sh
+          CHANGE_ADDRESS=$(submission/02.sh)
+          echo "CHANGE_ADDRESS=$CHANGE_ADDRESS"
+          if [[ "$CHANGE_ADDRESS" =~ ^bcrt1[ac-hj-np-z02-9]{8,87}$ ]]; then
+            echo "Change address generation passed!"
+          else
+            echo "Change address generation failed!"
+            exit 1
+          fi
+
+      - name: Verify Adding Funds to SegWit Address
+        run: |
+          chmod +x submission/03.sh
+          ADD=$(submission/03.sh)
+          echo "ADD=$ADD"
+          BALANCE=$(bitcoin-cli -regtest getreceivedbyaddress "$ADD" 0)
+          if (( $(echo "$BALANCE > 0" | bc -l) )); then
+            echo "Adding funds to SegWit address passed!"
+          else
+            echo "Adding funds to SegWit address failed!"
+            exit 1
+          fi
+
+      - name: Verify Listing the current UTXOs in your wallet.
+        run: |
+          chmod +x submission/04.sh
+          UTXOs=$(submission/04.sh)
+          if [[ "$UTXOs" != "[]" && "$UTXOs" =~ "txid" ]]; then
+            echo "Listing the current UTXOs in your wallet passed!"
+          else
+            echo "Listing the current UTXOs in your wallet failed!"
+            exit 1
+          fi
+
+      - name: Verify Transaction ID
+        run: |
+          chmod +x submission/05.sh
+          TRANSACTION_ID=$(submission/05.sh)
+          EXPECTED_OUTPUT=23c19f37d4e92e9a115aab86e4edc1b92a51add4e0ed0034bb166314dde50e16
+          if [[ "$TRANSACTION_ID" == "$EXPECTED_OUTPUT" ]]; then
+            echo "Transaction ID Check passed!"
+          else
+            echo "Transaction ID Check failed!"
+            exit 1
+          fi
+
+      - name: Verify Total Transaction Output
+        run: |
+          chmod +x submission/06.sh
+          ACTUAL_OUTPUT=$(submission/06.sh)
+          EXPECTED_OUTPUT=23679108
+          if [[ "$ACTUAL_OUTPUT" == "$EXPECTED_OUTPUT" ]]; then
+            echo "Total Transaction Output Check passed!"
+          else
+            echo "Total Transaction Output Check failed!"
+            exit 1
+          fi
+
+      - name: Verify Raw Transaction Hex
+        run: |
+          chmod +x submission/07.sh
+          ACTUAL_OUTPUT=$(submission/07.sh)
+          EXPECTED_OUTPUT=0200000002160ee5dd146316bb3400ede0d4ad512ab9c1ede486ab5a119a2ee9d4379fc1230000000000fdffffff160ee5dd146316bb3400ede0d4ad512ab9c1ede486ab5a119a2ee9d4379fc1230100000000fdffffff01002d31010000000017a91421ed90762e16eaaea188aae19142e5b25bf75d238700000000
+          if [[ "$ACTUAL_OUTPUT" == "$EXPECTED_OUTPUT" ]]; then
+            echo "Total Transaction Output Check passed!"
+          else
+            echo "Total Transaction Output Check failed!"
+            exit 1
+          fi
+      
